@@ -1,0 +1,37 @@
+const bcrypt = require("bcryptjs");
+const { validationResult } = require("express-validator");
+const User = require("../models/User");
+const generateToken = require("../utils/generateToken");
+
+exports.signup = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty())
+    return res.status(400).json({ errors: errors.array() });
+
+  const { email, password } = req.body;
+
+  const exists = await User.findOne({ email });
+  if (exists)
+    return res.status(400).json({ message: "Email already registered" });
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await User.create({ email, password: hashedPassword });
+
+  res.status(201).json({ message: "Signup successful" });
+};
+
+exports.login = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user)
+    return res.status(400).json({ message: "Invalid credentials" });
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch)
+    return res.status(400).json({ message: "Invalid credentials" });
+
+  const token = generateToken(user._id);
+
+  res.json({ token });
+};
